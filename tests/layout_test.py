@@ -500,6 +500,24 @@ class LayoutTest(jtu.JaxTestCase):
         'Layout passed to jit does not match the layout on the respective arg'):
       g(arr)
 
+  def test_layout_donation(self):
+    if jtu.test_device_matches(["gpu"]):
+      self.skipTest("This test does not work on GPU backend.")
+    mesh = jtu.create_global_mesh((2, 2), ('x', 'y'))
+    s = NamedSharding(mesh, P('x', 'y'))
+    shape = (16, 128)
+    np_inp = np.arange(math.prod(shape)).reshape(shape)
+
+    custom_dll = DLL(major_to_minor=(0, 1))
+    arr = jax.device_put(np_inp, Layout(custom_dll, s))
+
+    @partial(jax.jit, in_shardings=Layout(custom_dll, s), donate_argnums=0)
+    def f(x):
+      return x
+
+    out = f(arr)
+    self.assertTrue(arr.is_deleted())
+
 
 if __name__ == '__main__':
   absltest.main(testLoader=jtu.JaxTestLoader())

@@ -988,6 +988,20 @@ def lower_jaxpr_to_module(
         "In multi-platform lowering either all or no lowering platforms "
         f"should support donation. Lowering for {platforms} of which "
         f"only {platforms_with_donation} support donation")
+    def _is_default_layout(curr_layout, sharding, aval):
+      if (curr_layout is None or isinstance(backend_or_name, str)
+          or sharding is None):
+        return True
+      if isinstance(curr_layout, AutoLayout):
+        return False
+      d = sharding._device_assignment[0]
+      return curr_layout == d.client.get_default_layout(
+          aval.dtype, aval.shape, d)
+    if not (
+        all(map(_is_default_layout, in_layouts, arg_shardings, in_avals)) and
+        all(map(_is_default_layout, out_layouts, result_shardings, out_avals))
+    ):
+      xla_donated_args = donated_args
     if num_partitions > 1 and (
         result_shardings is None or all(s is None for s in result_shardings)):
       xla_donated_args = donated_args
